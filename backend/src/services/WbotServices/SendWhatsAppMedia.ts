@@ -1,5 +1,5 @@
 import { WAMessage, AnyMessageContent } from "@whiskeysockets/baileys";
-import * as Sentry from "@sentry/node";
+
 import fs from "fs";
 import { exec } from "child_process";
 import path from "path";
@@ -7,19 +7,16 @@ import ffmpegPath from "@ffmpeg-installer/ffmpeg";
 import AppError from "../../errors/AppError";
 import GetTicketWbot from "../../helpers/GetTicketWbot";
 import Ticket from "../../models/Ticket";
-import mime from "mime-types";
-import formatBody from "../../helpers/Mustache";
 
 interface Request {
   media: Express.Multer.File;
   ticket: Ticket;
   body?: string;
-  isForwarded?: boolean;  
 }
 
 const publicFolder = path.resolve(__dirname, "..", "..", "..", "public");
 
-const processAudio = async (audio: string): Promise<string> => {
+export const processAudio = async (audio: string): Promise<string> => {
   const outputAudio = `${publicFolder}/${new Date().getTime()}.mp3`;
   return new Promise((resolve, reject) => {
     exec(
@@ -33,7 +30,7 @@ const processAudio = async (audio: string): Promise<string> => {
   });
 };
 
-const processAudioFile = async (audio: string): Promise<string> => {
+export const processAudioFile = async (audio: string): Promise<string> => {
   const outputAudio = `${publicFolder}/${new Date().getTime()}.mp3`;
   return new Promise((resolve, reject) => {
     exec(
@@ -47,79 +44,10 @@ const processAudioFile = async (audio: string): Promise<string> => {
   });
 };
 
-export const getMessageOptions = async (
-  fileName: string,
-  pathMedia: string,
-  body?: string
-): Promise<any> => {
-  const mimeType = mime.lookup(pathMedia);
-  const typeMessage = mimeType.split("/")[0];
-
-  try {
-    if (!mimeType) {
-      throw new Error("Invalid mimetype");
-    }
-    let options: AnyMessageContent;
-
-    if (typeMessage === "video") {
-      options = {
-        video: fs.readFileSync(pathMedia),
-        caption: body ? body : '',
-        fileName: fileName
-        // gifPlayback: true
-      };
-    } else if (typeMessage === "audio") {
-      const typeAudio = true; //fileName.includes("audio-record-site");
-      const convert = await processAudio(pathMedia);
-      if (typeAudio) {
-        options = {
-          audio: fs.readFileSync(convert),
-          mimetype: typeAudio ? "audio/mp4" : mimeType,
-          caption: body ? body : null,
-          ptt: true
-        };
-      } else {
-        options = {
-          audio: fs.readFileSync(convert),
-          mimetype: typeAudio ? "audio/mp4" : mimeType,
-          caption: body ? body : null,
-          ptt: true
-        };
-      }
-    } else if (typeMessage === "document") {
-      options = {
-        document: fs.readFileSync(pathMedia),
-        caption: body ? body : null,
-        fileName: fileName,
-        mimetype: mimeType
-      };
-    } else if (typeMessage === "application") {
-      options = {
-        document: fs.readFileSync(pathMedia),
-        caption: body ? body : null,
-        fileName: fileName,
-        mimetype: mimeType
-      };
-    } else {
-      options = {
-        image: fs.readFileSync(pathMedia),
-        caption: body ? body : null
-      };
-    }
-
-    return options;
-  } catch (e) {
-    Sentry.captureException(e);
-    console.log(e);
-    return null;
-  }
-};
-
 const SendWhatsAppMedia = async ({
   media,
   ticket,
-  body,
-  isForwarded = false
+  body
 }: Request): Promise<WAMessage> => {
   try {
     const wbot = await GetTicketWbot(ticket);
@@ -127,14 +55,12 @@ const SendWhatsAppMedia = async ({
     const pathMedia = media.path;
     const typeMessage = media.mimetype.split("/")[0];
     let options: AnyMessageContent;
-    const bodyMessage = formatBody(body, ticket.contact)
 
     if (typeMessage === "video") {
       options = {
         video: fs.readFileSync(pathMedia),
-        caption: bodyMessage,
-        fileName: media.originalname,
-        contextInfo: { forwardingScore: isForwarded ? 2 : 0, isForwarded: isForwarded }
+        caption: body,
+        fileName: media.originalname
         // gifPlayback: true
       };
     } else if (typeMessage === "audio") {
@@ -144,38 +70,33 @@ const SendWhatsAppMedia = async ({
         options = {
           audio: fs.readFileSync(convert),
           mimetype: typeAudio ? "audio/mp4" : media.mimetype,
-          ptt: true,
-          contextInfo: { forwardingScore: isForwarded ? 2 : 0, isForwarded: isForwarded }
+          ptt: true
         };
       } else {
         const convert = await processAudioFile(media.path);
         options = {
           audio: fs.readFileSync(convert),
-          mimetype: typeAudio ? "audio/mp4" : media.mimetype,
-          contextInfo: { forwardingScore: isForwarded ? 2 : 0, isForwarded: isForwarded }
+          mimetype: typeAudio ? "audio/mp4" : media.mimetype
         };
       }
-    } else if (typeMessage === "document" || typeMessage === "text") {
+    } else if (typeMessage === "document") {
       options = {
         document: fs.readFileSync(pathMedia),
-        caption: bodyMessage,
+        caption: body,
         fileName: media.originalname,
-        mimetype: media.mimetype,
-        contextInfo: { forwardingScore: isForwarded ? 2 : 0, isForwarded: isForwarded }
+        mimetype: media.mimetype
       };
     } else if (typeMessage === "application") {
       options = {
         document: fs.readFileSync(pathMedia),
-        caption: bodyMessage,
+        caption: body,
         fileName: media.originalname,
-        mimetype: media.mimetype,
-        contextInfo: { forwardingScore: isForwarded ? 2 : 0, isForwarded: isForwarded }
+        mimetype: media.mimetype
       };
     } else {
       options = {
         image: fs.readFileSync(pathMedia),
-        caption: bodyMessage,
-        contextInfo: { forwardingScore: isForwarded ? 2 : 0, isForwarded: isForwarded }
+        caption: body
       };
     }
 
@@ -186,11 +107,10 @@ const SendWhatsAppMedia = async ({
       }
     );
 
-    await ticket.update({ lastMessage: bodyMessage });
+    await ticket.update({ lastMessage: media.filename });
 
     return sentMessage;
   } catch (err) {
-    Sentry.captureException(err);
     console.log(err);
     throw new AppError("ERR_SENDING_WAPP_MSG");
   }

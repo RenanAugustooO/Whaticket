@@ -1,31 +1,26 @@
-import { initWASocket } from "../../libs/wbot";
-import Whatsapp from "../../models/Whatsapp";
-import { wbotMessageListener } from "./wbotMessageListener";
 import { getIO } from "../../libs/socket";
-import wbotMonitor from "./wbotMonitor";
+import { initWbot } from "../../libs/wbot";
+import Whatsapp from "../../models/Whatsapp";
 import { logger } from "../../utils/logger";
-import * as Sentry from "@sentry/node";
+import { wbotMessageListener } from "./wbotMessageListener";
+import wbotMonitor from "./wbotMonitor";
 
 export const StartWhatsAppSession = async (
-  whatsapp: Whatsapp,
-  companyId: number
+  whatsapp: Whatsapp
 ): Promise<void> => {
   await whatsapp.update({ status: "OPENING" });
 
   const io = getIO();
-  io.emit(`company-${companyId}-whatsappSession`, {
+  io.emit("whatsappSession", {
     action: "update",
     session: whatsapp
   });
 
-
   try {
-    const wbot = await initWASocket(whatsapp);
-
-    wbotMessageListener(wbot, companyId);
-    await wbotMonitor(wbot, whatsapp, companyId);
+    const wbot = await initWbot(whatsapp);
+    wbotMessageListener(wbot);
+    wbotMonitor(wbot, whatsapp);
   } catch (err) {
-    Sentry.captureException(err);
     logger.error(err);
   }
 };

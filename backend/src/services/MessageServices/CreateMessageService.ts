@@ -12,20 +12,16 @@ interface MessageData {
   read?: boolean;
   mediaType?: string;
   mediaUrl?: string;
-  ack?: number;
-  queueId?: number;
-  isForwarded?: boolean;  
+  textMassMessage?: string
 }
 interface Request {
   messageData: MessageData;
-  companyId: number;
 }
 
 const CreateMessageService = async ({
-  messageData,
-  companyId
+  messageData
 }: Request): Promise<Message> => {
-  await Message.upsert({ ...messageData, companyId });
+  await Message.upsert(messageData);
 
   const message = await Message.findByPk(messageData.id, {
     include: [
@@ -34,8 +30,7 @@ const CreateMessageService = async ({
         model: Ticket,
         as: "ticket",
         include: [
-          "contact",
-          "queue",
+          "contact", "queue",
           {
             model: Whatsapp,
             as: "whatsapp",
@@ -51,21 +46,18 @@ const CreateMessageService = async ({
     ]
   });
 
-  if (message.ticket.queueId !== null && message.queueId === null) {
-    await message.update({ queueId: message.ticket.queueId });
-  }
-
   if (!message) {
     throw new Error("ERR_CREATING_MESSAGE");
   }
 
   const io = getIO();
   io.to(message.ticketId.toString())
-    .to(`company-${companyId}-${message.ticket.status}`)
-    .to(`company-${companyId}-notification`)
+    .to(message.ticket.status)
+    .to("notification")
+    // send message to specific queues
     .to(`queue-${message.ticket.queueId}-${message.ticket.status}`)
     .to(`queue-${message.ticket.queueId}-notification`)
-    .emit(`company-${companyId}-appMessage`, {
+    .emit("appMessage", {
       action: "create",
       message,
       ticket: message.ticket,

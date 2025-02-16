@@ -9,15 +9,11 @@ import {
   AllowNull,
   Unique,
   Default,
-  HasMany,
-  ForeignKey,
-  BelongsTo
+  HasMany
 } from "sequelize-typescript";
 import ContactCustomField from "./ContactCustomField";
-import Ticket from "./Ticket";
-import Company from "./Company";
 import Schedule from "./Schedule";
-import Whatsapp from "./Whatsapp";
+import Ticket from "./Ticket";
 
 @Table
 class Contact extends Model<Contact> {
@@ -39,7 +35,6 @@ class Contact extends Model<Contact> {
   @Column
   email: string;
 
-  @Default("")
   @Column
   profilePicUrl: string;
 
@@ -59,17 +54,6 @@ class Contact extends Model<Contact> {
   @HasMany(() => ContactCustomField)
   extraInfo: ContactCustomField[];
 
-  @Default(true)
-  @Column
-  active: boolean;
-
-  @ForeignKey(() => Company)
-  @Column
-  companyId: number;
-
-  @BelongsTo(() => Company)
-  company: Company;
-
   @HasMany(() => Schedule, {
     onUpdate: "CASCADE",
     onDelete: "CASCADE",
@@ -77,12 +61,6 @@ class Contact extends Model<Contact> {
   })
   schedules: Schedule[];
 
-  @ForeignKey(() => Whatsapp)
-  @Column
-  whatsappId: number;
-
-  @BelongsTo(() => Whatsapp)
-  whatsapp: Whatsapp;
 }
 
 export default Contact;

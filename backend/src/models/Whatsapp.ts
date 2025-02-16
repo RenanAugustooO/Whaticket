@@ -11,16 +11,11 @@ import {
   AllowNull,
   HasMany,
   Unique,
-  BelongsToMany,
-  ForeignKey,
-  BelongsTo
+  BelongsToMany
 } from "sequelize-typescript";
 import Queue from "./Queue";
 import Ticket from "./Ticket";
 import WhatsappQueue from "./WhatsappQueue";
-import Company from "./Company";
-import Prompt from "./Prompt";
-import QueueIntegrations from "./QueueIntegrations";
 
 @Table
 class Whatsapp extends Model<Whatsapp> {
@@ -52,28 +47,15 @@ class Whatsapp extends Model<Whatsapp> {
   @Column
   retries: number;
 
-  @Default("")
   @Column(DataType.TEXT)
   greetingMessage: string;
 
-  @Default("")
   @Column(DataType.TEXT)
   farewellMessage: string;
 
-  @Default("")
-  @Column(DataType.TEXT)
-  complationMessage: string;
-
-  @Default("")
-  @Column(DataType.TEXT)
-  outOfHoursMessage: string;
-
-  @Default("")
-  @Column(DataType.TEXT)
-  ratingMessage: string;
-
-  @Column({ defaultValue: "stable" })
-  provider: string;
+  @Default(false)
+  @Column(DataType.BOOLEAN)
+  isMultidevice: boolean;
 
   @Default(false)
   @AllowNull
@@ -95,57 +77,49 @@ class Whatsapp extends Model<Whatsapp> {
   @HasMany(() => WhatsappQueue)
   whatsappQueues: WhatsappQueue[];
 
-  @ForeignKey(() => Company)
-  @Column
-  companyId: number;
-
-  @BelongsTo(() => Company)
-  company: Company;
+  @Column(DataType.TEXT)
+  transferTicketMessage: string;
 
   @Column
-  token: string;
-
-  //@Default(0)
-  //@Column
-  //timeSendQueue: number;
-
-  //@Column
-  //sendIdQueue: number;
-  
-  @Column
-  transferQueueId: number;
+  startWorkHour: string;
 
   @Column
-  timeToTransfer: number;  
+  endWorkHour: string;
 
-  @ForeignKey(() => Prompt)
+  @AllowNull
+  @Column(DataType.TEXT)
+  startWorkHourWeekend: string;
+
+  @AllowNull
   @Column
-  promptId: number;
-
-  @BelongsTo(() => Prompt)
-  prompt: Prompt;
-
-  @ForeignKey(() => QueueIntegrations)
-  @Column
-  integrationId: number;
-
-  @BelongsTo(() => QueueIntegrations)
-  queueIntegrations: QueueIntegrations;
+  endWorkHourWeekend: string;
 
   @Column
-  maxUseBotQueues: number;
+  defineWorkHours: string;
 
   @Column
-  timeUseBotQueues: string;
+  monday: boolean;
 
   @Column
-  expiresTicket: number;
-  
+  tuesday: boolean;
+
   @Column
-  number: string;
-  
+  wednesday: boolean;
+
   @Column
-  expiresInactiveMessage: string;
+  thursday: boolean;
+
+  @Column
+  friday: boolean;
+
+  @Column
+  saturday: boolean;
+
+  @Column
+  sunday: boolean;
+
+  @Column(DataType.TEXT)
+  outOfWorkMessage: string;
 }
 
 export default Whatsapp;
