@@ -7,8 +7,8 @@ cd /home/deploy/whaticket/backend
 sudo su - deploy << EOF
 cat <<[-]EOF > /home/deploy/whaticket/backend/.env
 NODE_ENV=
-BACKEND_URL=http://localhost
-FRONTEND_URL=http://localhost:3000
+BACKEND_URL=http://apiwhats.a3.tec.br
+FRONTEND_URL=http://whats.a3.tec.br
 PROXY_PORT=8080
 PORT=8080
 
