@@ -60,26 +60,14 @@ const QueueSelect = ({ selectedQueueIds, onChange }) => {
 					}}
 					renderValue={selected => (
 						<div className={classes.chips}>
-						
 							{selected?.length > 0 &&
 								selected.map(id => {
-									if (id === "0") {
-										return (
-											<Chip
-												key={id}
-												size="small"
-												label={i18n.t("queueSelect.withoutQueue")}
-												className={classes.chip}
-											/>
-										);
-									}
 									const queue = queues.find(q => q.id === id);
 									return queue ? (
 										<Chip
 											key={id}
 											style={{ backgroundColor: queue.color }}
 											variant="outlined"
-											size="small"
 											label={queue.name}
 											className={classes.chip}
 										/>
@@ -88,9 +76,6 @@ const QueueSelect = ({ selectedQueueIds, onChange }) => {
 						</div>
 					)}
 				>
-					<MenuItem value="0">
-						{i18n.t("queueSelect.withoutQueue")}
-					</MenuItem>
 					{queues.map(queue => (
 						<MenuItem key={queue.id} value={queue.id}>
 							{queue.name}

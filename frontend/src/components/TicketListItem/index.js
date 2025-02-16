@@ -99,6 +99,21 @@ const useStyles = makeStyles((theme) => ({
     top: "0%",
     left: "0%",
   },
+
+  userTag: {
+    position: "absolute",
+    marginRight: 5,
+    right: 5,
+    bottom: 5,
+    background: "#2576D2",
+    color: "#ffffff",
+    border: "1px solid #CCC",
+    padding: 1,
+    paddingLeft: 5,
+    paddingRight: 5,
+    borderRadius: 10,
+    fontSize: "0.9em",
+  },
 }));
 
 const TicketListItem = ({ ticket }) => {
@@ -115,10 +130,10 @@ const TicketListItem = ({ ticket }) => {
     };
   }, []);
 
-  const handleAcepptTicket = async (ticket) => {
+  const handleAcepptTicket = async (id) => {
     setLoading(true);
     try {
-      await api.put(`/tickets/${ticket.id}`, {
+      await api.put(`/tickets/${id}`, {
         status: "open",
         userId: user?.id,
       });
@@ -129,11 +144,11 @@ const TicketListItem = ({ ticket }) => {
     if (isMounted.current) {
       setLoading(false);
     }
-    history.push(`/tickets/${ticket.uuid}`);
+    history.push(`/tickets/${id}`);
   };
 
-  const handleSelectTicket = (ticket) => {
-    history.push(`/tickets/${ticket.uuid}`);
+  const handleSelectTicket = (id) => {
+    history.push(`/tickets/${id}`);
   };
 
   return (
@@ -143,7 +158,7 @@ const TicketListItem = ({ ticket }) => {
         button
         onClick={(e) => {
           if (ticket.status === "pending") return;
-          handleSelectTicket(ticket);
+          handleSelectTicket(ticket.id);
         }}
         selected={ticketId && +ticketId === ticket.id}
         className={clsx(classes.ticket, {
@@ -182,7 +197,7 @@ const TicketListItem = ({ ticket }) => {
                   color="primary"
                 />
               )}
-{/*               {ticket.lastMessage && (
+              {ticket.lastMessage && (
                 <Typography
                   className={classes.lastMessageTime}
                   component="span"
@@ -195,10 +210,27 @@ const TicketListItem = ({ ticket }) => {
                     <>{format(parseISO(ticket.updatedAt), "dd/MM/yyyy")}</>
                   )}
                 </Typography>
-              )} */}
+              )}
+              {ticket.whatsappId && (
+                <div
+                  className={classes.userTag}
+                  title={i18n.t("ticketsList.connectionTitle")}
+                >
+                  {ticket.whatsapp?.name}
+                </div>
+              )}
+
+              {ticket.channel !== "whatsapp" && (
+                <div
+                  className={classes.userTag}
+                  title={i18n.t("ticketsList.connectionTitle")}
+                >
+                  {ticket.channel}
+                </div>
+              )}
             </span>
           }
-/*           secondary={
+          secondary={
             <span className={classes.contactNameWrapper}>
               <Typography
                 className={classes.contactLastMessage}
@@ -210,7 +242,7 @@ const TicketListItem = ({ ticket }) => {
                 {ticket.lastMessage ? (
                   <MarkdownWrapper>{ticket.lastMessage}</MarkdownWrapper>
                 ) : (
-                  <MarkdownWrapper></MarkdownWrapper>
+                  <br />
                 )}
               </Typography>
 
@@ -222,7 +254,7 @@ const TicketListItem = ({ ticket }) => {
                 }}
               />
             </span>
-          } */
+          }
         />
         {ticket.status === "pending" && (
           <ButtonWithSpinner
@@ -231,7 +263,7 @@ const TicketListItem = ({ ticket }) => {
             className={classes.acceptButton}
             size="small"
             loading={loading}
-            onClick={(e) => handleAcepptTicket(ticket)}
+            onClick={(e) => handleAcepptTicket(ticket.id)}
           >
             {i18n.t("ticketsList.buttons.accept")}
           </ButtonWithSpinner>

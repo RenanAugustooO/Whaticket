@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import * as Yup from "yup";
 import { Formik, Form, Field } from "formik";
 import { toast } from "react-toastify";
 
 import { makeStyles } from "@material-ui/core/styles";
 import { green } from "@material-ui/core/colors";
-import { isNil, head } from "lodash";
 
 import {
   Dialog,
@@ -17,22 +16,25 @@ import {
   TextField,
   Switch,
   FormControlLabel,
-  Grid,
   FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  IconButton
+  FormGroup,
+  Tooltip,
+  Paper,
+  Grid,
+  Checkbox,
 } from "@material-ui/core";
 
 import api from "../../services/api";
 import { i18n } from "../../translate/i18n";
 import toastError from "../../errors/toastError";
 import QueueSelect from "../QueueSelect";
-import moment from "moment";
-import AttachFileIcon from "@material-ui/icons/AttachFile";
-import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
-import ConfirmationModal from "../ConfirmationModal";
+
+const longText = `
+Desmarque esta opção para definir um horário de expediente para os atendimentos.
+Quando um usuário escolher ser direcionado a um atendente, o sistema irá
+verificar o horário e o dia, se estiver fora do expediente, envia um aviso
+ao usuário e não direciona ao atendente escolhido.
+`;
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -59,6 +61,45 @@ const useStyles = makeStyles((theme) => ({
     marginTop: -12,
     marginLeft: -12,
   },
+
+  expediente: {
+    display: "flex",
+    flexWrap: "wrap",
+  },
+  tituloReceberMsg: {
+    fontSize: 12,
+    marginLeft: theme.spacing(1),
+    marginTop: theme.spacing(1),
+    marginBottom: theme.spacing(1),
+  },
+  reabrirTicket: {
+    fontSize: 12,
+    display: "flex",
+    marginLeft: theme.spacing(2),
+  },
+  textSize: {
+    fontSize: 12,
+  },
+  paperReceberMsg: {
+    marginTop: theme.spacing(1),
+    marginBottom: theme.spacing(1),
+  },
+  diasSemana: {
+    marginLeft: theme.spacing(1),
+  },
+  hora: {
+    marginLeft: theme.spacing(1),
+    marginRight: theme.spacing(1),
+    marginTop: theme.spacing(1),
+    marginBottom: theme.spacing(1),
+    width: 250,
+  },
+  textoExpediente: {
+    marginTop: theme.spacing(2),
+    marginLeft: theme.spacing(1),
+    marginBottom: theme.spacing(3),
+    width: "100%",
+  },
 }));
 
 const SessionSchema = Yup.object().shape({
@@ -73,65 +114,49 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
   const initialState = {
     name: "",
     greetingMessage: "",
-    complationMessage: "",
-    outOfHoursMessage: "",
-    ratingMessage: "",
+    farewellMessage: "",
     isDefault: false,
-    token: "",
-    provider: "beta",
-    timeSendQueue: 0,
-    sendIdQueue: 0,
-    expiresInactiveMessage: "",
-    expiresTicket: 0,
-    timeUseBotQueues: 0,
-    maxUseBotQueues: 3,
-    attachment: null,
-    mediaName: "",
+    isMultidevice: true,
+    transferTicketMessage: "",
   };
   const [whatsApp, setWhatsApp] = useState(initialState);
   const [selectedQueueIds, setSelectedQueueIds] = useState([]);
-  const [queues, setQueues] = useState([]);
-  const [selectedPrompt, setSelectedPrompt] = useState(null);
-  const [prompts, setPrompts] = useState([]);
-  const [enableImportMessage, setEnableImportMessage] = useState(false);
-  const [importOldMessagesGroups, setImportOldMessagesGroups] = useState(false);
-  const [closedTicketsPostImported, setClosedTicketsPostImported] = useState(false);
-  const [importOldMessages, setImportOldMessages] = useState(moment().add(-1, "days").format("YYYY-MM-DDTHH:mm"));
-  const [importRecentMessages, setImportRecentMessages] = useState(moment().add(-1, "minutes").format("YYYY-MM-DDTHH:mm"));
-  const [confirmationOpen, setConfirmationOpen] = useState(false);
-
-  const attachmentFile = useRef(null);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data } = await api.get("/prompt");
-        setPrompts(data.prompts);
-      } catch (err) {
-        toastError(err);
-      }
-    })();
-  }, [whatsAppId]);
+  const [defineWorkHours, SetDefineWorkHours] = useState(false);
+  const [outOfWorkMessage, setOutOfWorkMessage] = useState("");
+  const [startWorkHour, setStartWorkHour] = useState("08:00");
+  const [endWorkHour, setEndWorkHour] = useState("17:30");
+  const [startWorkHourWeekend, setStartWorkHourWeekend] = useState("08:00");
+  const [endWorkHourWeekend, setEndWorkHourWeekend] = useState("17:30");
+  const [seg, setSeg] = useState(true);
+  const [ter, setTer] = useState(true);
+  const [quar, setQuar] = useState(true);
+  const [quin, setQuin] = useState(true);
+  const [sex, setSex] = useState(true);
+  const [sab, setSab] = useState(false);
+  const [dom, setDom] = useState(false);
 
   useEffect(() => {
     const fetchSession = async () => {
       if (!whatsAppId) return;
 
       try {
-        const { data } = await api.get(`whatsapp/${whatsAppId}?session=0`);
-
+        const { data } = await api.get(`whatsapp/${whatsAppId}`);
         setWhatsApp(data);
-        data.promptId ? setSelectedPrompt(data.promptId) : setSelectedPrompt(null);
-
+        setSeg(data.monday);
+        setTer(data.tuesday);
+        setQuar(data.wednesday);
+        setQuin(data.thursday);
+        setSex(data.friday);
+        setSab(data.saturday);
+        setDom(data.sunday);
+        SetDefineWorkHours(data.defineWorkHours);
+        setOutOfWorkMessage(data.outOfWorkMessage);
+        setStartWorkHour(data.startWorkHour);
+        setEndWorkHour(data.endWorkHour);
+        setStartWorkHourWeekend(data.startWorkHourWeekend);
+        setEndWorkHourWeekend(data.endWorkHourWeekend);
         const whatsQueueIds = data.queues?.map((queue) => queue.id);
         setSelectedQueueIds(whatsQueueIds);
-        if (!isNil(data?.importOldMessages)) {
-          setEnableImportMessage(true);
-          setImportOldMessages(data?.importOldMessages);
-          setImportRecentMessages(data?.importRecentMessages);
-          setClosedTicketsPostImported(data?.closedTicketsPostImported);
-          setImportOldMessagesGroups(data?.importOldMessagesGroups);
-        }
       } catch (err) {
         toastError(err);
       }
@@ -139,68 +164,58 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
     fetchSession();
   }, [whatsAppId]);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data } = await api.get("/queue");
-        setQueues(data);
-      } catch (err) {
-        toastError(err);
-      }
-    })();
-  }, []);
+  const handleChange = (e) => {
+    if (e.target.value === "MON") {
+      setSeg(e.target.checked);
+    }
+    if (e.target.value === "TUE") {
+      setTer(e.target.checked);
+    }
+    if (e.target.value === "WED") {
+      setQuar(e.target.checked);
+    }
+    if (e.target.value === "THU") {
+      setQuin(e.target.checked);
+    }
+    if (e.target.value === "FRI") {
+      setSex(e.target.checked);
+    }
+    if (e.target.value === "SAT") {
+      setSab(e.target.checked);
+    }
+    if (e.target.value === "SUN") {
+      setDom(e.target.checked);
+    }
 
-  const handleEnableImportMessage = async (e) => {
-    setEnableImportMessage(e.target.checked);
-
+    if (e.target.value === "defineWorkHours") {
+      SetDefineWorkHours(e.target.checked);
+    }
   };
 
   const handleSaveWhatsApp = async (values) => {
     const whatsappData = {
-      ...values, queueIds: selectedQueueIds,
-      promptId: selectedPrompt ? selectedPrompt : null,
-      importOldMessages: enableImportMessage ? importOldMessages : null,
-      importRecentMessages: enableImportMessage ? importRecentMessages : null,
-      importOldMessagesGroups: importOldMessagesGroups ? importOldMessagesGroups : null,
-      closedTicketsPostImported: closedTicketsPostImported ? closedTicketsPostImported : null,
+      ...values,
+      queueIds: selectedQueueIds,
+      startWorkHour: startWorkHour,
+      endWorkHour: endWorkHour,
+      defineWorkHours: defineWorkHours,
+      outOfWorkMessage: outOfWorkMessage,
+      startWorkHourWeekend: startWorkHourWeekend,
+      endWorkHourWeekend: endWorkHourWeekend,
+      monday: seg,
+      tuesday: ter,
+      wednesday: quar,
+      thursday: quin,
+      friday: sex,
+      saturday: sab,
+      sunday: dom,
     };
-    delete whatsappData["queues"];
-    delete whatsappData["session"];
 
     try {
       if (whatsAppId) {
-        if (whatsAppId && enableImportMessage && whatsApp?.status === "CONNECTED") {
-          try {
-            setWhatsApp({ ...whatsApp, status: "qrcode" });
-            await api.delete(`/whatsappsession/${whatsApp.id}`);
-          } catch (err) {
-            toastError(err);
-          }
-        }
-
         await api.put(`/whatsapp/${whatsAppId}`, whatsappData);
-
-        if (values.attachment && values.attachment.size) {
-
-          const formData = new FormData();
-          formData.append("file", values.attachment);
-
-          await api.post(`/whatsapp/${whatsAppId}/media-upload`, formData);
-
-        }
-
       } else {
-        const { data } = await api.post("/whatsapp", whatsappData);
-
-        if (values.attachment) {
-
-          const formData = new FormData();
-          formData.append("file", values.attachment);
-
-          await api.post(`/whatsapp/${data.id}/media-upload`, formData);
-
-        }
-
+        await api.post("/whatsapp", whatsappData);
       }
       toast.success(i18n.t("whatsappModal.success"));
       handleClose();
@@ -209,56 +224,17 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
     }
   };
 
-  const handleChangeQueue = (e) => {
-    setSelectedQueueIds(e);
-    setSelectedPrompt(null);
-  };
-
-  const handleChangePrompt = (e) => {
-    setSelectedPrompt(e.target.value);
-    setSelectedQueueIds([]);
-  };
-
   const handleClose = () => {
     onClose();
-    setEnableImportMessage(false);
     setWhatsApp(initialState);
   };
 
-  const removeMedia = async () => {
-
-
-    await api.delete(`/whatsapp/${whatsAppId}/media-upload`);
-    handleClose();
-
-  }
-
-  const handleAttach = (e, setFile) => {
-    const file = head(e.target.files);
-
-    console.log(file);
-
-    if (file) {
-      setFile('attachment', file);
-    }
-  }
-
   return (
     <div className={classes.root}>
-
-      <ConfirmationModal
-        open={confirmationOpen}
-        onClose={() => setConfirmationOpen(false)}
-        onConfirm={removeMedia}
-        title={i18n.t("whatsappModal.confirmation.title")}
-      >
-        {i18n.t("whatsappModal.confirmation.message")}
-      </ConfirmationModal>
-
       <Dialog
         open={open}
         onClose={handleClose}
-        maxWidth="md"
+        maxWidth="sm"
         fullWidth
         scroll="paper"
       >
@@ -278,186 +254,42 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
             }, 400);
           }}
         >
-          {({ values, touched, errors, isSubmitting, setFieldValue }) => (
+          {({ values, touched, errors, isSubmitting }) => (
             <Form>
               <DialogContent dividers>
                 <div className={classes.multFieldLine}>
-                  <Grid spacing={2} container>
-                    <Grid item>
+                  <Field
+                    as={TextField}
+                    label={i18n.t("whatsappModal.form.name")}
+                    autoFocus
+                    name="name"
+                    error={touched.name && Boolean(errors.name)}
+                    helperText={touched.name && errors.name}
+                    variant="outlined"
+                    margin="dense"
+                    className={classes.textField}
+                  />
+                  <FormControlLabel
+                    control={
                       <Field
-                        as={TextField}
-                        label={i18n.t("whatsappModal.form.name")}
-                        autoFocus
-                        name="name"
-                        error={touched.name && Boolean(errors.name)}
-                        helperText={touched.name && errors.name}
-                        variant="outlined"
-                        margin="dense"
-                        className={classes.textField}
+                        as={Switch}
+                        color="primary"
+                        name="isDefault"
+                        checked={values.isDefault}
                       />
-                    </Grid>
-                    <Grid style={{ paddingTop: 15 }} item>
-                      <FormControlLabel
-                        control={
-                          <Field
-                            as={Switch}
-                            color="primary"
-                            name="isDefault"
-                            checked={values.isDefault}
-                          />
-                        }
-                        label={i18n.t("whatsappModal.form.default")}
-                      />
-                    </Grid>
-                  </Grid>
+                    }
+                    label={i18n.t("whatsappModal.form.default")}
+                  />
+
+              
                 </div>
-                <div className={classes.importMessage}>
-                  <div className={classes.multFieldLine}>
-                    <FormControlLabel
-                      style={{ marginRight: 7, color: "gray" }}
-                      label={i18n.t("whatsappModal.form.importOldMessagesEnable")}
-                      labelPlacement="end"
-                      control={
-                        <Switch
-                          size="medium"
-                          checked={enableImportMessage}
-                          onChange={handleEnableImportMessage}
-                          name="importOldMessagesEnable"
-                          color="primary"
-                        />
-                      }
-                    />
-
-                    {enableImportMessage ? (
-                      <>
-                        <FormControlLabel
-                          style={{ marginRight: 7, color: "gray" }}
-                          label={i18n.t(
-                            "whatsappModal.form.importOldMessagesGroups"
-                          )}
-                          labelPlacement="end"
-                          control={
-                            <Switch
-                              size="medium"
-                              checked={importOldMessagesGroups}
-                              onChange={(e) =>
-                                setImportOldMessagesGroups(e.target.checked)
-                              }
-                              name="importOldMessagesGroups"
-                              color="primary"
-                            />
-                          }
-                        />
-
-                        <FormControlLabel
-                          style={{ marginRight: 7, color: "gray" }}
-                          label={i18n.t(
-                            "whatsappModal.form.closedTicketsPostImported"
-                          )}
-                          labelPlacement="end"
-                          control={
-                            <Switch
-                              size="medium"
-                              checked={closedTicketsPostImported}
-                              onChange={(e) =>
-                                setClosedTicketsPostImported(e.target.checked)
-                              }
-                              name="closedTicketsPostImported"
-                              color="primary"
-                            />
-                          }
-                        />
-                      </>) : <></>}
-                  </div>
-
-                  {enableImportMessage ? (
-                    <Grid style={{ marginTop: 18 }} container spacing={3}>
-                      <Grid item xs={6}>
-                        <Field
-                          fullWidth
-                          as={TextField}
-                          label={i18n.t("whatsappModal.form.importOldMessages")}
-                          type="datetime-local"
-                          name="importOldMessages"
-                          inputProps={{
-                            max: moment()
-                              .add(0, "minutes")
-                              .format("YYYY-MM-DDTHH:mm"),
-                            min: moment()
-                              .add(-2, "years")
-                              .format("YYYY-MM-DDTHH:mm"),
-                          }}
-                          //min="2022-11-06T22:22:55"
-                          InputLabelProps={{
-                            shrink: true,
-                          }}
-                          error={
-                            touched.importOldMessages &&
-                            Boolean(errors.importOldMessages)
-                          }
-                          helperText={
-                            touched.importOldMessages && errors.importOldMessages
-                          }
-                          variant="outlined"
-                          value={moment(importOldMessages).format(
-                            "YYYY-MM-DDTHH:mm"
-                          )}
-                          onChange={(e) => {
-                            setImportOldMessages(e.target.value);
-                          }}
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <Field
-                          fullWidth
-                          as={TextField}
-                          label={i18n.t("whatsappModal.form.importRecentMessages")}
-                          type="datetime-local"
-                          name="importRecentMessages"
-                          inputProps={{
-                            max: moment()
-                              .add(0, "minutes")
-                              .format("YYYY-MM-DDTHH:mm"),
-                            min: moment(importOldMessages).format(
-                              "YYYY-MM-DDTHH:mm"
-                            )
-                          }}
-                          //min="2022-11-06T22:22:55"
-                          InputLabelProps={{
-                            shrink: true,
-                          }}
-                          error={
-                            touched.importRecentMessages &&
-                            Boolean(errors.importRecentMessages)
-                          }
-                          helperText={
-                            touched.importRecentMessages && errors.importRecentMessages
-                          }
-                          variant="outlined"
-                          value={moment(importRecentMessages).format(
-                            "YYYY-MM-DDTHH:mm"
-                          )}
-                          onChange={(e) => {
-                            setImportRecentMessages(e.target.value);
-                          }}
-                        />
-                      </Grid>
-                    </Grid>
-
-                  ) : null}
-                </div>
-                {enableImportMessage && (
-                  <span style={{ color: "red" }}>
-                    {i18n.t("whatsappModal.form.importAlert")}
-                  </span>
-                )}
                 <div>
                   <Field
                     as={TextField}
                     label={i18n.t("queueModal.form.greetingMessage")}
                     type="greetingMessage"
                     multiline
-                    rows={4}
+                    rows={5}
                     fullWidth
                     name="greetingMessage"
                     error={
@@ -473,261 +305,307 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                 <div>
                   <Field
                     as={TextField}
-                    label={i18n.t("queueModal.form.complationMessage")}
-                    type="complationMessage"
+                    label={i18n.t("whatsappModal.form.farewellMessage")}
+                    type="farewellMessage"
                     multiline
-                    rows={4}
+                    rows={5}
                     fullWidth
-                    name="complationMessage"
+                    name="farewellMessage"
                     error={
-                      touched.complationMessage &&
-                      Boolean(errors.complationMessage)
+                      touched.farewellMessage && Boolean(errors.farewellMessage)
                     }
                     helperText={
-                      touched.complationMessage && errors.complationMessage
+                      touched.farewellMessage && errors.farewellMessage
                     }
                     variant="outlined"
                     margin="dense"
                   />
                 </div>
+
                 <div>
                   <Field
                     as={TextField}
-                    label={i18n.t("queueModal.form.outOfHoursMessage")}
-                    type="outOfHoursMessage"
+                    label="Mensagem de trasnferencia de atendimento"
+                    type="transferTicketMessage"
                     multiline
-                    rows={4}
+                    rows={5}
                     fullWidth
-                    name="outOfHoursMessage"
+                    name="transferTicketMessage"
                     error={
-                      touched.outOfHoursMessage &&
-                      Boolean(errors.outOfHoursMessage)
+                      touched.transferTicketMessage &&
+                      Boolean(errors.transferTicketMessage)
                     }
                     helperText={
-                      touched.outOfHoursMessage && errors.outOfHoursMessage
+                      touched.transferTicketMessage &&
+                      errors.transferTicketMessage
                     }
                     variant="outlined"
                     margin="dense"
                   />
                 </div>
+
                 <div>
-                  <Field
-                    as={TextField}
-                    label={i18n.t("queueModal.form.ratingMessage")}
-                    type="ratingMessage"
-                    multiline
-                    rows={4}
-                    fullWidth
-                    name="ratingMessage"
-                    error={
-                      touched.ratingMessage && Boolean(errors.ratingMessage)
-                    }
-                    helperText={touched.ratingMessage && errors.ratingMessage}
-                    variant="outlined"
-                    margin="dense"
-                  />
+                  {/* Expediente */}
+
+                  {defineWorkHours === true ? (
+                    <div
+                    // className={classes.textoExpediente}
+                    >
+                      <TextField
+                        label={i18n.t("queueModal.form.outOfWorkMessage")}
+                        rows={4}
+                        multiline
+                        fullWidth
+                        name="outOfWorkMessage"
+                        value={outOfWorkMessage}
+                        error={
+                          touched.outOfWorkMessage &&
+                          Boolean(errors.outOfWorkMessage)
+                        }
+                        helperText={
+                          touched.outOfWorkMessage && errors.outOfWorkMessage
+                        }
+                        variant="outlined"
+                        margin="dense"
+                        onChange={(e) => setOutOfWorkMessage(e.target.value)}
+                      />
+                    </div>
+                  ) : (
+                    ""
+                  )}
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={12} className={classes.diasSemana}>
+                      <FormControl component="fieldset">
+                        <FormGroup
+                          aria-label="position"
+                          row
+                          sx={{
+                            width: {
+                              xs: 100,
+                              sm: 200,
+                              md: 300,
+                              lg: 600,
+                              xl: 700,
+                            },
+                          }}
+                        >
+                          <Tooltip title={longText} placement="top">
+                            <FormControlLabel
+                              value="defineWorkHours"
+                              control={
+                                <Checkbox
+                                  size="small"
+                                  checked={defineWorkHours}
+                                  onChange={handleChange}
+                                />
+                              }
+                              label="Definir horário de expediente"
+                              labelPlacement="end"
+                            />
+                          </Tooltip>
+                        </FormGroup>
+                      </FormControl>
+                    </Grid>
+                    {defineWorkHours === true ? (
+                      <>
+                        <Grid item xs={12} sm={6}>
+                          <TextField
+                            className={classes.hora}
+                            type="time"
+                            label={i18n.t("queueModal.form.startWorkHour")}
+                            name="startWorkHour"
+                            value={startWorkHour}
+                            onChange={(e) => setStartWorkHour(e.target.value)}
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <TextField
+                            className={classes.hora}
+                            type="time"
+                            label={i18n.t("queueModal.form.endWorkHour")}
+                            name="endWorkHour"
+                            value={endWorkHour}
+                            onChange={(e) => setEndWorkHour(e.target.value)}
+                          />
+                        </Grid>
+                      </>
+                    ) : (
+                      ""
+                    )}
+                  </Grid>
+                  {defineWorkHours === true ? (
+                    <>
+                      <Grid item xs={12} sm={12} className={classes.diasSemana}>
+                        <FormControl component="fieldset">
+                          <FormGroup
+                            aria-label="position"
+                            row
+                            sx={{
+                              width: {
+                                xs: 100,
+                                sm: 200,
+                                md: 300,
+                                lg: 600,
+                                xl: 700,
+                              },
+                            }}
+                          >
+                            <FormControlLabel
+                              value="MON"
+                              control={
+                                <Checkbox
+                                  size="small"
+                                  checked={seg}
+                                  onChange={handleChange}
+                                />
+                              }
+                              label={i18n.t("queueModal.form.monday")}
+                              labelPlacement="end"
+                            />
+                            <FormControlLabel
+                              value="TUE"
+                              control={
+                                <Checkbox
+                                  size="small"
+                                  checked={ter}
+                                  onChange={handleChange}
+                                />
+                              }
+                              label={i18n.t("queueModal.form.tuesday")}
+                              labelPlacement="end"
+                            />
+                            <FormControlLabel
+                              value="WED"
+                              control={
+                                <Checkbox
+                                  size="small"
+                                  checked={quar}
+                                  onChange={handleChange}
+                                />
+                              }
+                              label={i18n.t("queueModal.form.wednesday")}
+                              labelPlacement="end"
+                            />
+                            <FormControlLabel
+                              value="THU"
+                              control={
+                                <Checkbox
+                                  size="small"
+                                  checked={quin}
+                                  onChange={handleChange}
+                                />
+                              }
+                              label={i18n.t("queueModal.form.thursday")}
+                              labelPlacement="end"
+                            />
+                            <FormControlLabel
+                              value="FRI"
+                              control={
+                                <Checkbox
+                                  size="small"
+                                  checked={sex}
+                                  onChange={handleChange}
+                                />
+                              }
+                              label={i18n.t("queueModal.form.friday")}
+                              labelPlacement="end"
+                            />
+                          </FormGroup>
+                        </FormControl>
+                      </Grid>
+                    </>
+                  ) : (
+                    ""
+                  )}
+                  {defineWorkHours === true ? (
+                    <>
+                      <Paper>
+                        <Grid container spacing={2} style={{ marginTop: 10 }}>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              className={classes.hora}
+                              type="time"
+                              label={i18n.t("queueModal.form.startWorkHour")}
+                              name="StartWorkHourWeekend"
+                              value={startWorkHourWeekend}
+                              onChange={(e) =>
+                                setStartWorkHourWeekend(e.target.value)
+                              }
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              className={classes.hora}
+                              type="time"
+                              label={i18n.t("queueModal.form.endWorkHour")}
+                              name="EndWorkHourWeekend"
+                              value={endWorkHourWeekend}
+                              onChange={(e) =>
+                                setEndWorkHourWeekend(e.target.value)
+                              }
+                            />
+                          </Grid>
+                        </Grid>
+                        <Grid
+                          item
+                          xs={12}
+                          sm={12}
+                          className={classes.diasSemana}
+                        >
+                          <FormControl component="fieldset">
+                            <FormGroup
+                              aria-label="position"
+                              row
+                              sx={{
+                                width: {
+                                  xs: 100,
+                                  sm: 200,
+                                  md: 300,
+                                  lg: 600,
+                                  xl: 700,
+                                },
+                              }}
+                            >
+                              <FormControlLabel
+                                value="SAT"
+                                control={
+                                  <Checkbox
+                                    size="small"
+                                    checked={sab}
+                                    onChange={handleChange}
+                                  />
+                                }
+                                label={i18n.t("queueModal.form.saturday")}
+                                labelPlacement="end"
+                              />
+                              <FormControlLabel
+                                value="SUN"
+                                control={
+                                  <Checkbox
+                                    size="small"
+                                    checked={dom}
+                                    onChange={handleChange}
+                                  />
+                                }
+                                label={i18n.t("queueModal.form.sunday")}
+                                labelPlacement="end"
+                              />
+                            </FormGroup>
+                          </FormControl>
+                        </Grid>
+                      </Paper>
+                    </>
+                  ) : (
+                    ""
+                  )}
                 </div>
-                <div>
-                  <Field
-                    as={TextField}
-                    label={i18n.t("queueModal.form.token")}
-                    type="token"
-                    fullWidth
-                    name="token"
-                    variant="outlined"
-                    margin="dense"
-                  />
-                </div>
+
                 <QueueSelect
                   selectedQueueIds={selectedQueueIds}
-                  onChange={(selectedIds) => handleChangeQueue(selectedIds)}
+                  onChange={(selectedIds) => setSelectedQueueIds(selectedIds)}
                 />
-                <FormControl
-                  margin="dense"
-                  variant="outlined"
-                  fullWidth
-                >
-                  <InputLabel>
-                    {i18n.t("whatsappModal.form.prompt")}
-                  </InputLabel>
-                  <Select
-                    labelId="dialog-select-prompt-label"
-                    id="dialog-select-prompt"
-                    name="promptId"
-                    value={selectedPrompt || ""}
-                    onChange={handleChangePrompt}
-                    label={i18n.t("whatsappModal.form.prompt")}
-                    fullWidth
-                    MenuProps={{
-                      anchorOrigin: {
-                        vertical: "bottom",
-                        horizontal: "left",
-                      },
-                      transformOrigin: {
-                        vertical: "top",
-                        horizontal: "left",
-                      },
-                      getContentAnchorEl: null,
-                    }}
-                  >
-                    {prompts.map((prompt) => (
-                      <MenuItem
-                        key={prompt.id}
-                        value={prompt.id}
-                      >
-                        {prompt.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <div>
-                  <h3>{i18n.t("whatsappModal.form.queueRedirection")}</h3>
-                  <p>{i18n.t("whatsappModal.form.queueRedirectionDesc")}</p>
-                  <Grid spacing={2} container>
-
-                    <Grid xs={6} md={6} item>
-                      <FormControl
-                        variant="outlined"
-                        margin="dense"
-                        className={classes.FormControl}
-                        fullWidth
-                      >
-                        <InputLabel id="sendIdQueue-selection-label">
-                          {i18n.t("whatsappModal.form.sendIdQueue")}
-                        </InputLabel>
-                        <Field
-                          as={Select}
-                          name="sendIdQueue"
-                          id="sendIdQueue"
-                          label={i18n.t("whatsappModal.form.sendIdQueue")}
-                          placeholder={i18n.t("whatsappModal.form.sendIdQueue")}
-                          labelId="sendIdQueue-selection-label"
-                        >
-                          <MenuItem value={0}>&nbsp;</MenuItem>
-                          {queues.map(queue => (
-                            <MenuItem key={queue.id} value={queue.id}>
-                              {queue.name}
-                            </MenuItem>
-                          ))}
-                        </Field>
-                      </FormControl>
-
-                    </Grid>
-
-                    <Grid xs={6} md={6} item>
-                      <Field
-                        as={TextField}
-                        label={i18n.t("whatsappModal.form.timeSendQueue")}
-                        fullWidth
-                        name="timeSendQueue"
-                        variant="outlined"
-                        margin="dense"
-                        error={touched.timeSendQueue && Boolean(errors.timeSendQueue)}
-                        helperText={touched.timeSendQueue && errors.timeSendQueue}
-                      />
-                    </Grid>
-
-                  </Grid>
-                  <Grid spacing={2} container>
-                    {/* QUANTIDADE MÁXIMA DE VEZES QUE O CHATBOT VAI SER ENVIADO */}
-                    <Grid xs={12} md={6} item>
-                      <Field
-                        as={TextField}
-                        label={i18n.t("whatsappModal.form.maxUseBotQueues")}
-                        fullWidth
-                        name="maxUseBotQueues"
-                        variant="outlined"
-                        margin="dense"
-                        error={touched.maxUseBotQueues && Boolean(errors.maxUseBotQueues)}
-                        helperText={touched.maxUseBotQueues && errors.maxUseBotQueues}
-                      />
-                    </Grid>
-                    {/* TEMPO PARA ENVIO DO CHATBOT */}
-                    <Grid xs={12} md={6} item>
-                      <Field
-                        as={TextField}
-                        label={i18n.t("whatsappModal.form.timeUseBotQueues")}
-                        fullWidth
-                        name="timeUseBotQueues"
-                        variant="outlined"
-                        margin="dense"
-                        error={touched.timeUseBotQueues && Boolean(errors.timeUseBotQueues)}
-                        helperText={touched.timeUseBotQueues && errors.timeUseBotQueues}
-                      />
-                    </Grid>
-                  </Grid>
-                  <Grid spacing={2} container>
-                    {/* ENCERRAR CHATS ABERTOS APÓS X HORAS */}
-                    <Grid xs={12} md={12} item>
-                      <Field
-                        as={TextField}
-                        label={i18n.t("whatsappModal.form.expiresTicket")}
-                        fullWidth
-                        name="expiresTicket"
-                        variant="outlined"
-                        margin="dense"
-                        error={touched.expiresTicket && Boolean(errors.expiresTicket)}
-                        helperText={touched.expiresTicket && errors.expiresTicket}
-                      />
-                    </Grid>
-                  </Grid>
-                  {/* MENSAGEM POR INATIVIDADE*/}
-                  <div>
-                    <Field
-                      as={TextField}
-                      label={i18n.t("whatsappModal.form.expiresInactiveMessage")}
-                      multiline
-                      rows={4}
-                      fullWidth
-                      name="expiresInactiveMessage"
-                      error={touched.expiresInactiveMessage && Boolean(errors.expiresInactiveMessage)}
-                      helperText={touched.expiresInactiveMessage && errors.expiresInactiveMessage}
-                      variant="outlined"
-                      margin="dense"
-                    />
-                  </div>
-                </div>
-
-
-                {/* {values?.attachment || values?.mediaName && ( */}
-                <Grid xs={12} item>
-                  <Button startIcon={<AttachFileIcon />}>
-                    {values?.attachment ? values?.attachment?.name : whatsApp?.mediaName}
-                  </Button>
-                  <IconButton
-                    onClick={() => values.attachment?.size ? setFieldValue('attachment', null) : setConfirmationOpen(true)}
-                    color="secondary"
-                  >
-                    <DeleteOutlineIcon color="secondary" />
-                  </IconButton>
-                </Grid>
-
-                {/* )} */}
-
-                <div style={{ display: "none" }}>
-                  <input
-                    type="file"
-                    ref={attachmentFile}
-                    onChange={(e) => handleAttach(e, setFieldValue)}
-                  />
-                </div>
-
-
               </DialogContent>
               <DialogActions>
-
-                {!values.attachment && !values.mediaName && (
-                  <Button
-                    color="primary"
-                    onClick={() => attachmentFile.current.click()}
-                    disabled={isSubmitting}
-                    variant="outlined"
-                  >
-                    {i18n.t("quickMessages.buttons.attach")}
-                  </Button>
-
-                )}
-
                 <Button
                   onClick={handleClose}
                   color="secondary"

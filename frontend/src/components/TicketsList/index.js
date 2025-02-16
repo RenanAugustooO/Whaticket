@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useReducer, useContext } from "react";
+import openSocket from "../../services/socket-io";
 
 import { makeStyles } from "@material-ui/core/styles";
 import List from "@material-ui/core/List";
@@ -9,9 +10,7 @@ import TicketsListSkeleton from "../TicketsListSkeleton";
 
 import useTickets from "../../hooks/useTickets";
 import { i18n } from "../../translate/i18n";
-import { ListSubheader } from "@material-ui/core";
 import { AuthContext } from "../../context/Auth/AuthContext";
-import { SocketContext } from "../../context/Socket/SocketContext";
 
 const useStyles = makeStyles((theme) => ({
   ticketsListWrapper: {
@@ -88,7 +87,7 @@ const reducer = (state, action) => {
       }
     });
 
-    return [...newTickets];
+    return [...state];
   }
 
   if (action.type === "RESET_UNREAD") {
@@ -153,45 +152,49 @@ const reducer = (state, action) => {
   }
 };
 
-const TicketsList = ({
-  status,
-  searchParam,
-  tags,
-  showAll,
-  selectedQueueIds,
-}) => {
+const TicketsList = (props) => {
+  const {
+    status,
+    searchParam,
+    showAll,
+    selectedQueueIds,
+    updateCount,
+    style,
+    tags,
+  } = props;
   const classes = useStyles();
   const [pageNumber, setPageNumber] = useState(1);
   const [ticketsList, dispatch] = useReducer(reducer, []);
   const { user } = useContext(AuthContext);
-
-  const socketManager = useContext(SocketContext);
+	const { profile, queues } = user;
 
   useEffect(() => {
     dispatch({ type: "RESET" });
     setPageNumber(1);
-  }, [status, searchParam, dispatch, showAll, selectedQueueIds]);
+  }, [status, searchParam, dispatch, showAll, selectedQueueIds, tags]);
 
   const { tickets, hasMore, loading } = useTickets({
     pageNumber,
     searchParam,
-    tags: JSON.stringify(tags),
     status,
     showAll,
+    tags: JSON.stringify(tags),
     queueIds: JSON.stringify(selectedQueueIds),
   });
 
-  useEffect(() => {
-    if (!status && !searchParam) return;
-    dispatch({
-      type: "LOAD_TICKETS",
-      payload: tickets,
-    });
-  }, [tickets, status, searchParam]);
+	useEffect(() => {
+		const queueIds = queues.map((q) => q.id);
+		const filteredTickets = tickets.filter((t) => queueIds.indexOf(t.queueId) > -1);
+
+		if (profile === "user") {
+			dispatch({ type: "LOAD_TICKETS", payload: filteredTickets });
+		} else {
+			dispatch({ type: "LOAD_TICKETS", payload: tickets });
+		}
+	}, [tickets, status, searchParam, queues, profile]);
 
   useEffect(() => {
-    const companyId = localStorage.getItem("companyId");
-    const socket = socketManager.getSocket(companyId);
+    const socket = openSocket();
 
     const shouldUpdateTicket = (ticket) =>
       (!ticket.userId || ticket.userId === user?.id || showAll) &&
@@ -200,7 +203,7 @@ const TicketsList = ({
     const notBelongsToUserQueues = (ticket) =>
       ticket.queueId && selectedQueueIds.indexOf(ticket.queueId) === -1;
 
-    socket.on("connect", () => {
+    socket.on("ready", () => {
       if (status) {
         socket.emit("joinTickets", status);
       } else {
@@ -208,7 +211,7 @@ const TicketsList = ({
       }
     });
 
-    socket.on(`company-${companyId}-ticket`, (data) => {
+    socket.on("ticket", (data) => {
       if (data.action === "updateUnread") {
         dispatch({
           type: "RESET_UNREAD",
@@ -232,7 +235,7 @@ const TicketsList = ({
       }
     });
 
-    socket.on(`company-${companyId}-appMessage`, (data) => {
+    socket.on("appMessage", (data) => {
       if (data.action === "create" && shouldUpdateTicket(data.ticket)) {
         dispatch({
           type: "UPDATE_TICKET_UNREAD_MESSAGES",
@@ -241,7 +244,7 @@ const TicketsList = ({
       }
     });
 
-    socket.on(`company-${companyId}-contact`, (data) => {
+    socket.on("contact", (data) => {
       if (data.action === "update") {
         dispatch({
           type: "UPDATE_TICKET_CONTACT",
@@ -253,7 +256,14 @@ const TicketsList = ({
     return () => {
       socket.disconnect();
     };
-  }, [status, showAll, user, selectedQueueIds, socketManager]);
+  }, [status, showAll, user, selectedQueueIds]);
+
+  useEffect(() => {
+    if (typeof updateCount === "function") {
+      updateCount(ticketsList.length);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticketsList]);
 
   const loadMore = () => {
     setPageNumber((prevState) => prevState + 1);
@@ -270,7 +280,7 @@ const TicketsList = ({
   };
 
   return (
-    <div className={classes.ticketsListWrapper}>
+    <Paper className={classes.ticketsListWrapper} style={style}>
       <Paper
         square
         name="closed"
@@ -279,26 +289,6 @@ const TicketsList = ({
         onScroll={handleScroll}
       >
         <List style={{ paddingTop: 0 }}>
-          {status === "open" && (
-            <ListSubheader className={classes.ticketsListHeader}>
-              <div>
-                {i18n.t("ticketsList.assignedHeader")}
-                <span className={classes.ticketsCount}>
-                  {ticketsList.length}
-                </span>
-              </div>
-            </ListSubheader>
-          )}
-          {status === "pending" && (
-            <ListSubheader className={classes.ticketsListHeader}>
-              <div>
-                {i18n.t("ticketsList.pendingHeader")}
-                <span className={classes.ticketsCount}>
-                  {ticketsList.length}
-                </span>
-              </div>
-            </ListSubheader>
-          )}
           {ticketsList.length === 0 && !loading ? (
             <div className={classes.noTicketsDiv}>
               <span className={classes.noTicketsTitle}>
@@ -318,7 +308,7 @@ const TicketsList = ({
           {loading && <TicketsListSkeleton />}
         </List>
       </Paper>
-    </div>
+    </Paper>
   );
 };
 

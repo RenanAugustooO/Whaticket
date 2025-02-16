@@ -1,69 +1,30 @@
-import React, { useContext, useEffect, useReducer, useState } from "react";
-import { Link as RouterLink, useHistory } from "react-router-dom";
-
+import { Badge } from "@material-ui/core";
+import Divider from "@material-ui/core/Divider";
 import ListItem from "@material-ui/core/ListItem";
 import ListItemIcon from "@material-ui/core/ListItemIcon";
 import ListItemText from "@material-ui/core/ListItemText";
 import ListSubheader from "@material-ui/core/ListSubheader";
-import Divider from "@material-ui/core/Divider";
-import { Badge, Collapse, List, Typography } from "@material-ui/core";
-import DashboardOutlinedIcon from "@material-ui/icons/DashboardOutlined";
-import WhatsAppIcon from "@material-ui/icons/WhatsApp";
-import SyncAltIcon from "@material-ui/icons/SyncAlt";
-import SettingsOutlinedIcon from "@material-ui/icons/SettingsOutlined";
-import PeopleAltOutlinedIcon from "@material-ui/icons/PeopleAltOutlined";
-import ContactPhoneOutlinedIcon from "@material-ui/icons/ContactPhoneOutlined";
+import { AddCircleOutline, ChatBubbleOutlineOutlined, LibraryBooks } from "@material-ui/icons";
 import AccountTreeOutlinedIcon from "@material-ui/icons/AccountTreeOutlined";
-import FlashOnIcon from "@material-ui/icons/FlashOn";
-import HelpOutlineIcon from "@material-ui/icons/HelpOutline";
-import CodeRoundedIcon from "@material-ui/icons/CodeRounded";
+import ContactPhoneOutlinedIcon from "@material-ui/icons/ContactPhoneOutlined";
+import DashboardOutlinedIcon from "@material-ui/icons/DashboardOutlined";
 import EventIcon from "@material-ui/icons/Event";
 import LocalOfferIcon from "@material-ui/icons/LocalOffer";
-import EventAvailableIcon from "@material-ui/icons/EventAvailable";
-import ExpandLessIcon from "@material-ui/icons/ExpandLess";
-import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
-import PeopleIcon from "@material-ui/icons/People";
-import ListIcon from "@material-ui/icons/ListAlt";
-import AnnouncementIcon from "@material-ui/icons/Announcement";
-import ForumIcon from "@material-ui/icons/Forum";
-import LocalAtmIcon from '@material-ui/icons/LocalAtm';
-import RotateRight from "@material-ui/icons/RotateRight";
-import { i18n } from "../translate/i18n";
-import { WhatsAppsContext } from "../context/WhatsApp/WhatsAppsContext";
-import { AuthContext } from "../context/Auth/AuthContext";
-import LoyaltyRoundedIcon from '@material-ui/icons/LoyaltyRounded';
+import PeopleAltOutlinedIcon from "@material-ui/icons/PeopleAltOutlined";
+import QuestionAnswerOutlinedIcon from "@material-ui/icons/QuestionAnswerOutlined";
+import SettingsOutlinedIcon from "@material-ui/icons/SettingsOutlined";
+import SyncAltIcon from "@material-ui/icons/SyncAlt";
+import WhatsAppIcon from "@material-ui/icons/WhatsApp";
+import React, { useContext, useEffect, useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import { Can } from "../components/Can";
-import { SocketContext } from "../context/Socket/SocketContext";
-import { isArray } from "lodash";
-import api from "../services/api";
-import BorderColorIcon from '@material-ui/icons/BorderColor';
-import ToDoList from "../pages/ToDoList/";
-import toastError from "../errors/toastError";
-import { makeStyles } from "@material-ui/core/styles";
-import { AllInclusive, AttachFile, BlurCircular, Description, DeviceHubOutlined, Schedule } from '@material-ui/icons';
-import usePlans from "../hooks/usePlans";
-
-const useStyles = makeStyles((theme) => ({
-  ListSubheader: {
-    height: 26,
-    marginTop: "-15px",
-    marginBottom: "-10px",
-  },
-  colorIcons: {
-    color: theme.palette.drawerIcons,
-  },
-
-  colorText: {
-    color: theme.palette.drawerText,
-  }
-
-}));
+import { AuthContext } from "../context/Auth/AuthContext";
+import { WhatsAppsContext } from "../context/WhatsApp/WhatsAppsContext";
+import { i18n } from "../translate/i18n";
 
 
 function ListItemLink(props) {
   const { icon, primary, to, className } = props;
-
-  const classes = useStyles();
 
   const renderLink = React.useMemo(
     () =>
@@ -75,166 +36,19 @@ function ListItemLink(props) {
 
   return (
     <li>
-      <ListItem button dense component={renderLink} className={classes.colorText}>
-        {icon ? <ListItemIcon className={classes.colorIcons}>{icon}</ListItemIcon> : null}
+      <ListItem button component={renderLink} className={className}>
+        {icon ? <ListItemIcon>{icon}</ListItemIcon> : null}
         <ListItemText primary={primary} />
       </ListItem>
     </li>
   );
 }
 
-const reducer = (state, action) => {
-  if (action.type === "LOAD_CHATS") {
-    const chats = action.payload;
-    const newChats = [];
-
-    if (isArray(chats)) {
-      chats.forEach((chat) => {
-        const chatIndex = state.findIndex((u) => u.id === chat.id);
-        if (chatIndex !== -1) {
-          state[chatIndex] = chat;
-        } else {
-          newChats.push(chat);
-        }
-      });
-    }
-
-    return [...state, ...newChats];
-  }
-
-  if (action.type === "UPDATE_CHATS") {
-    const chat = action.payload;
-    const chatIndex = state.findIndex((u) => u.id === chat.id);
-
-    if (chatIndex !== -1) {
-      state[chatIndex] = chat;
-      return [...state];
-    } else {
-      return [chat, ...state];
-    }
-  }
-
-  if (action.type === "DELETE_CHAT") {
-    const chatId = action.payload;
-
-    const chatIndex = state.findIndex((u) => u.id === chatId);
-    if (chatIndex !== -1) {
-      state.splice(chatIndex, 1);
-    }
-    return [...state];
-  }
-
-  if (action.type === "RESET") {
-    return [];
-  }
-
-  if (action.type === "CHANGE_CHAT") {
-    const changedChats = state.map((chat) => {
-      if (chat.id === action.payload.chat.id) {
-        return action.payload.chat;
-      }
-      return chat;
-    });
-    return changedChats;
-  }
-};
-
 const MainListItems = (props) => {
-  const classes = useStyles();
-  const { drawerClose, collapsed } = props;
+  const { drawerClose } = props;
   const { whatsApps } = useContext(WhatsAppsContext);
-  const { user, handleLogout } = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
   const [connectionWarning, setConnectionWarning] = useState(false);
-  const [openCampaignSubmenu, setOpenCampaignSubmenu] = useState(false);
-  const [showCampaigns, setShowCampaigns] = useState(false);
-  const [showKanban, setShowKanban] = useState(false);
-  const [showOpenAi, setShowOpenAi] = useState(false);
-  const [showIntegrations, setShowIntegrations] = useState(false); const history = useHistory();
-  const [showSchedules, setShowSchedules] = useState(false);
-  const [showInternalChat, setShowInternalChat] = useState(false);
-  const [showExternalApi, setShowExternalApi] = useState(false);
-
-  const actualTheme = localStorage.getItem("preferredTheme");
-
-  const [invisible, setInvisible] = useState(true);
-  const [pageNumber, setPageNumber] = useState(1);
-  const [searchParam] = useState("");
-  const [chats, dispatch] = useReducer(reducer, []);
-  const { getPlanCompany } = usePlans();
-
-  const socketManager = useContext(SocketContext);
-
-  useEffect(() => {
-    dispatch({ type: "RESET" });
-    setPageNumber(1);
-  }, [searchParam]);
-
-  useEffect(() => {
-    async function fetchData() {
-      const companyId = user.companyId;
-      const planConfigs = await getPlanCompany(undefined, companyId);
-
-      setShowCampaigns(planConfigs.plan.useCampaigns);
-      setShowKanban(planConfigs.plan.useKanban);
-      setShowOpenAi(planConfigs.plan.useOpenAi);
-      setShowIntegrations(planConfigs.plan.useIntegrations);
-      setShowSchedules(planConfigs.plan.useSchedules);
-      setShowInternalChat(planConfigs.plan.useInternalChat);
-      setShowExternalApi(planConfigs.plan.useExternalApi);
-    }
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      fetchChats();
-    }, 500);
-    return () => clearTimeout(delayDebounceFn);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParam, pageNumber]);
-
-  useEffect(() => {
-    const companyId = localStorage.getItem("companyId");
-    const socket = socketManager.getSocket(companyId);
-
-    socket.on(`company-${companyId}-chat`, (data) => {
-      if (data.action === "new-message") {
-        dispatch({ type: "CHANGE_CHAT", payload: data });
-      }
-      if (data.action === "update") {
-        dispatch({ type: "CHANGE_CHAT", payload: data });
-      }
-    });
-    return () => {
-      socket.disconnect();
-    };
-  }, [socketManager]);
-
-  useEffect(() => {
-    let unreadsCount = 0;
-    if (chats.length > 0) {
-      for (let chat of chats) {
-        for (let chatUser of chat.users) {
-          if (chatUser.userId === user.id) {
-            unreadsCount += chatUser.unreads;
-          }
-        }
-      }
-    }
-    if (unreadsCount > 0) {
-      setInvisible(false);
-    } else {
-      setInvisible(true);
-    }
-  }, [chats, user.id]);
-
-  useEffect(() => {
-    if (localStorage.getItem("cshow")) {
-      setShowCampaigns(true);
-    }
-  }, []);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -258,296 +72,55 @@ const MainListItems = (props) => {
     return () => clearTimeout(delayDebounceFn);
   }, [whatsApps]);
 
-  const fetchChats = async () => {
-    try {
-      const { data } = await api.get("/chats/", {
-        params: { searchParam, pageNumber },
-      });
-      dispatch({ type: "LOAD_CHATS", payload: data.records });
-    } catch (err) {
-      toastError(err);
-    }
-  };
-
-  const handleClickLogout = () => {
-    //handleCloseMenu();
-    handleLogout();
-  };
-
-
-
   return (
     <div onClick={drawerClose}>
-      <Can
-        role={user.profile}
-        perform={"drawer-service-items:view"}
-        style={{
-          overflowY: "scroll",
-        }}
-        no={() => (
-          <>
-            <ListSubheader
-              hidden={collapsed}
-              style={{
-                position: "relative",
-                fontSize: "17px",
-                textAlign: "left",
-                paddingLeft: 20
-              }}
-              inset
-              color="inherit">
-              <Typography variant="overline" style={{ fontWeight: 'normal' }}>  {i18n.t("Atendimento")} </Typography>
-            </ListSubheader>
-            <>
-
-              <ListItemLink
-                to="/tickets"
-                primary={i18n.t("mainDrawer.listItems.tickets")}
-                icon={<WhatsAppIcon />}
-              />
-              <ListItemLink
-                to="/quick-messages"
-                primary={i18n.t("mainDrawer.listItems.quickMessages")}
-                icon={<FlashOnIcon />}
-              />
-              {showKanban && (
-                <ListItemLink
-                  to="/kanban"
-                  primary="Kanban"
-                  icon={<LoyaltyRoundedIcon />}
-                />
-              )}
-              <ListItemLink
-                to="/todolist"
-                primary={i18n.t("Tarefas")}
-                icon={<BorderColorIcon />}
-              />
-              <ListItemLink
-                to="/contacts"
-                primary={i18n.t("mainDrawer.listItems.contacts")}
-                icon={<ContactPhoneOutlinedIcon />}
-              />
-              {showSchedules && (
-                <>
-                  <ListItemLink
-                    to="/schedules"
-                    primary={i18n.t("mainDrawer.listItems.schedules")}
-                    icon={<Schedule />}
-                  />
-                </>
-              )}
-              <ListItemLink
-                to="/tags"
-                primary={i18n.t("mainDrawer.listItems.tags")}
-                icon={<LocalOfferIcon />}
-              />
-              {showInternalChat && (
-                <>
-                  <ListItemLink
-                    to="/chats"
-                    primary={i18n.t("mainDrawer.listItems.chats")}
-                    icon={
-                      <Badge color="secondary" variant="dot" invisible={invisible}>
-                        <ForumIcon />
-                      </Badge>
-                    }
-                  />
-                </>
-              )}
-              <ListItemLink
-                to="/helps"
-                primary={i18n.t("mainDrawer.listItems.helps")}
-                icon={<HelpOutlineIcon />}
-              />
-            </>
-          </>
-        )}
+      <ListItemLink
+        to="/"
+        primary="Dashboard"
+        icon={<DashboardOutlinedIcon />}
+      />
+      <ListItemLink
+        to="/connections"
+        primary={i18n.t("mainDrawer.listItems.connections")}
+        icon={
+          <Badge
+            overlap="rectangular"
+            badgeContent={connectionWarning ? "!" : 0}
+            color="error"
+          >
+            <SyncAltIcon />
+          </Badge>
+        }
+      />
+      <ListItemLink
+        to="/tickets"
+        primary={i18n.t("mainDrawer.listItems.tickets")}
+        icon={<WhatsAppIcon />}
       />
 
-      <Can
-        role={user.profile}
-        perform={"drawer-admin-items:view"}
-        yes={() => (
-          <>
-            <ListSubheader
-              hidden={collapsed}
-              style={{
-                position: "relative",
-                fontSize: "17px",
-                textAlign: "left",
-                paddingLeft: 20
-              }}
-              inset
-              color="inherit">
-
-              <Typography variant="overline" style={{ fontWeight: 'normal' }}>  {i18n.t("Gerência")} </Typography>
-            </ListSubheader>
-
-            <ListItemLink
-              small
-              to="/"
-              primary="Dashboard"
-              icon={<DashboardOutlinedIcon />}
-            />
-            <ListItemLink
-              small
-              to="/reports"
-              primary={i18n.t("mainDrawer.listItems.reports")}
-              icon={<Description />}
-            />
-          </>
-        )}
+      <ListItemLink
+        to="/contacts"
+        primary={i18n.t("mainDrawer.listItems.contacts")}
+        icon={<ContactPhoneOutlinedIcon />}
+      />
+      <ListItemLink
+        to="/quickAnswers"
+        primary={i18n.t("mainDrawer.listItems.quickAnswers")}
+        icon={<QuestionAnswerOutlinedIcon />}
       />
       <Can
         role={user.profile}
         perform="drawer-admin-items:view"
         yes={() => (
           <>
-
-            {showCampaigns && (
-              <>
-                <ListSubheader
-                  hidden={collapsed}
-                  style={{
-                    position: "relative",
-                    fontSize: "17px",
-                    textAlign: "left",
-                    paddingLeft: 20
-                  }}
-                  inset
-                  color="inherit">
-                  <Typography variant="overline" style={{ fontWeight: 'normal' }}>  {i18n.t("Campanhas")} </Typography>
-                </ListSubheader>
-
-                <ListItemLink
-                  small
-                  to="/campaigns"
-                  primary={i18n.t("Listagem")}
-                  icon={<ListIcon />}
-                />
-
-                <ListItemLink
-                  small
-                  to="/contact-lists"
-                  primary={i18n.t("Listas de Contatos")}
-                  icon={<PeopleIcon />}
-                />
-
-
-                <ListItemLink
-                  small
-                  to="/campaigns-config"
-                  primary={i18n.t("Configurações")}
-                  icon={<ListIcon />}
-                />
-
-
-                {/** 
-                <ListItem
-                  button
-                  onClick={() => setOpenCampaignSubmenu((prev) => !prev)}
-                >
-                  <ListItemIcon>
-                    <EventAvailableIcon />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={i18n.t("mainDrawer.listItems.campaigns")}
-                  />
-                  {openCampaignSubmenu ? (
-                    <ExpandLessIcon />
-                  ) : (
-                    <ExpandMoreIcon />
-                  )}
-                </ListItem>
-                <Collapse
-                  style={{ paddingLeft: 15 }}
-                  in={openCampaignSubmenu}
-                  timeout="auto"
-                  unmountOnExit
-                >
-                  <List component="div" disablePadding>
-                    
-                    <ListItem onClick={() => history.push("/campaigns")} button>
-                      <ListItemIcon>
-                        <ListIcon />
-                      </ListItemIcon>
-                      <ListItemText primary="Listagem" />
-                    </ListItem>
-
-                    <ListItem
-                      onClick={() => history.push("/contact-lists")}
-                      button
-                    >
-                      <ListItemIcon>
-                        <PeopleIcon />
-                      </ListItemIcon>
-                      <ListItemText primary="Listas de Contatos" />
-                    </ListItem>
-
-                    <ListItem
-                      onClick={() => history.push("/campaigns-config")}
-                      button
-                    >
-                      <ListItemIcon>
-                        <SettingsOutlinedIcon />
-                      </ListItemIcon>
-                      <ListItemText primary="Configurações" />
-                    </ListItem>
-
-                  </List>
-                </Collapse>
-                */}
-              </>
-            )}
-
-            <ListSubheader
-              hidden={collapsed}
-              style={{
-                position: "relative",
-                fontSize: "17px",
-                textAlign: "left",
-                paddingLeft: 20
-              }}
-              inset
-              color="inherit">
-              <Typography variant="overline" style={{ fontWeight: 'normal' }}>  {i18n.t("Administração")} </Typography>
+            <Divider />
+            <ListSubheader inset>
+              {i18n.t("mainDrawer.listItems.administration")}
             </ListSubheader>
-
-            {user.super && (
-              <ListItemLink
-                to="/announcements"
-                primary={i18n.t("mainDrawer.listItems.annoucements")}
-                icon={<AnnouncementIcon />}
-              />
-            )}
-            {showOpenAi && (
-              <ListItemLink
-                to="/prompts"
-                primary={i18n.t("mainDrawer.listItems.prompts")}
-                icon={<AllInclusive />}
-              />
-            )}
-
-            {showIntegrations && (
-              <ListItemLink
-                to="/queue-integration"
-                primary={i18n.t("mainDrawer.listItems.queueIntegration")}
-                icon={<DeviceHubOutlined />}
-              />
-            )}
             <ListItemLink
-              to="/connections"
-              primary={i18n.t("mainDrawer.listItems.connections")}
-              icon={
-                <Badge badgeContent={connectionWarning ? "!" : 0} color="error">
-                  <SyncAltIcon />
-                </Badge>
-              }
-            />
-            <ListItemLink
-              to="/files"
-              primary={i18n.t("mainDrawer.listItems.files")}
-              icon={<AttachFile />}
+              to="/users"
+              primary={i18n.t("mainDrawer.listItems.users")}
+              icon={<PeopleAltOutlinedIcon />}
             />
             <ListItemLink
               to="/queues"
@@ -555,47 +128,42 @@ const MainListItems = (props) => {
               icon={<AccountTreeOutlinedIcon />}
             />
             <ListItemLink
-              to="/users"
-              primary={i18n.t("mainDrawer.listItems.users")}
-              icon={<PeopleAltOutlinedIcon />}
+              to="/schedules"
+              primary={i18n.t("mainDrawer.listItems.schedules")}
+              icon={<EventIcon />}
             />
-            {showExternalApi && (
-              <>
-                <ListItemLink
-                  to="/messages-api"
-                  primary={i18n.t("mainDrawer.listItems.messagesAPI")}
-                  icon={<CodeRoundedIcon />}
-                />
-              </>
-            )}
             <ListItemLink
-              to="/financeiro"
-              primary={i18n.t("mainDrawer.listItems.financeiro")}
-              icon={<LocalAtmIcon />}
+              to="/tags"
+              primary={i18n.t("mainDrawer.listItems.tags")}
+              icon={<LocalOfferIcon />}
             />
 
+<ListItemLink
+              to="/BulkMessage"
+              primary="Bulk Message"
+              icon={<ChatBubbleOutlineOutlined />}
+            />
+
+            <ListItemLink
+              to="/SettingsMessage"
+              primary="Configurações Envio"
+              icon={<AddCircleOutline />}
+            />
+
+            <ListItemLink
+              to="/ShippingReport"
+              primary="Relatório Envio"
+              icon={<LibraryBooks />}
+            />
+            
             <ListItemLink
               to="/settings"
               primary={i18n.t("mainDrawer.listItems.settings")}
               icon={<SettingsOutlinedIcon />}
             />
-            { }
-
           </>
         )}
       />
-      <li>
-        <ListItem
-          button
-          dense
-          onClick={handleClickLogout}>
-          <ListItemIcon><RotateRight /></ListItemIcon>
-          <ListItemText primary={i18n.t("mainDrawer.listItems.logout")} />
-        </ListItem>
-      </li>
-      <Divider />
-      {/**versão do software */}
-      <Typography variant="caption" align="center" style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}> Versão 7.0.0</Typography>
     </div>
   );
 };

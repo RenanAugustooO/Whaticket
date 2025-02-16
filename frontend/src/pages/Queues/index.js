@@ -1,4 +1,6 @@
-import React, { useEffect, useReducer, useState, useContext } from "react";
+import React, { useEffect, useReducer, useState } from "react";
+
+import openSocket from "socket.io-client";
 
 import {
   Button,
@@ -25,14 +27,12 @@ import { DeleteOutline, Edit } from "@material-ui/icons";
 import QueueModal from "../../components/QueueModal";
 import { toast } from "react-toastify";
 import ConfirmationModal from "../../components/ConfirmationModal";
-import { SocketContext } from "../../context/Socket/SocketContext";
 
 const useStyles = makeStyles((theme) => ({
   mainPaper: {
     flex: 1,
     padding: theme.spacing(1),
     overflowY: "scroll",
-    ...theme.scrollbarStyles,
   },
   customTableCell: {
     display: "flex",
@@ -94,8 +94,6 @@ const Queues = () => {
   const [selectedQueue, setSelectedQueue] = useState(null);
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
 
-  const socketManager = useContext(SocketContext);
-
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -112,10 +110,14 @@ const Queues = () => {
   }, []);
 
   useEffect(() => {
-    const companyId = localStorage.getItem("companyId");
-    const socket = socketManager.getSocket(companyId);
+    const token = JSON.parse(localStorage.getItem("token"));
 
-    socket.on(`company-${companyId}-queue`, (data) => {
+    const socket = openSocket(process.env.REACT_APP_BACKEND_URL, {query: {token}});
+    socket.on("ready", () => {
+      socket.emit("joinCompany")
+    });
+
+    socket.on("queue", (data) => {
       if (data.action === "update" || data.action === "create") {
         dispatch({ type: "UPDATE_QUEUES", payload: data.queue });
       }
@@ -128,14 +130,16 @@ const Queues = () => {
     return () => {
       socket.disconnect();
     };
-  }, [socketManager]);
+  }, []);
 
   const handleOpenQueueModal = () => {
     setQueueModalOpen(true);
     setSelectedQueue(null);
   };
 
+
   const handleCloseQueueModal = () => {
+    console.log('fechou modal')
     setQueueModalOpen(false);
     setSelectedQueue(null);
   };
@@ -179,6 +183,16 @@ const Queues = () => {
         open={queueModalOpen}
         onClose={handleCloseQueueModal}
         queueId={selectedQueue?.id}
+        onEdit={(res) => {
+          if(res) {
+              setTimeout(() => {
+                // setQueueModalOpen(true)
+                // setSelectedQueue(res.id)
+                handleEditQueue(res)
+                // handleOpenQueueModalChatbot(res.id)
+              }, 200)
+          }
+        }}
       />
       <MainHeader>
         <Title>{i18n.t("queues.title")}</Title>
@@ -197,16 +211,10 @@ const Queues = () => {
           <TableHead>
             <TableRow>
               <TableCell align="center">
-                {i18n.t("queues.table.id")}
-              </TableCell>
-              <TableCell align="center">
                 {i18n.t("queues.table.name")}
               </TableCell>
               <TableCell align="center">
                 {i18n.t("queues.table.color")}
-              </TableCell>
-              <TableCell align="center">
-                {i18n.t("queues.table.orderQueue")}
               </TableCell>
               <TableCell align="center">
                 {i18n.t("queues.table.greeting")}
@@ -220,7 +228,6 @@ const Queues = () => {
             <>
               {queues.map((queue) => (
                 <TableRow key={queue.id}>
-                  <TableCell align="center">{queue.id}</TableCell>
                   <TableCell align="center">{queue.name}</TableCell>
                   <TableCell align="center">
                     <div className={classes.customTableCell}>
@@ -232,17 +239,6 @@ const Queues = () => {
                           alignSelf: "center",
                         }}
                       />
-                    </div>
-                  </TableCell>
-                  <TableCell align="center">
-                    <div className={classes.customTableCell}>
-                      <Typography
-                        style={{ width: 300, align: "center" }}
-                        noWrap
-                        variant="body2"
-                      >
-                        {queue.orderQueue}
-                      </Typography>
                     </div>
                   </TableCell>
                   <TableCell align="center">

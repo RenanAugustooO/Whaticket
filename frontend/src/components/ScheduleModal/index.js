@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext } from "react";
 
 import * as Yup from "yup";
 import { Formik, Form, Field } from "formik";
@@ -19,16 +19,11 @@ import { i18n } from "../../translate/i18n";
 
 import api from "../../services/api";
 import toastError from "../../errors/toastError";
-import { FormControl, Grid, IconButton } from "@material-ui/core";
+import { FormControl } from "@material-ui/core";
 import Autocomplete from "@material-ui/lab/Autocomplete";
 import moment from "moment"
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { isArray, capitalize } from "lodash";
-import DeleteOutline from "@material-ui/icons/DeleteOutline";
-import AttachFile from "@material-ui/icons/AttachFile";
-import { head } from "lodash";
-import ConfirmationModal from "../ConfirmationModal";
-import MessageVariablesPicker from "../MessageVariablesPicker";
 
 const useStyles = makeStyles(theme => ({
 	root: {
@@ -68,7 +63,7 @@ const ScheduleSchema = Yup.object().shape({
 	sendAt: Yup.string().required("Obrigatório")
 });
 
-const ScheduleModal = ({ open, onClose, scheduleId, contactId, cleanContact, reload }) => {
+const ScheduleModal = ({ open, onClose, scheduleId, contactId, cleanContact, reload, setContactId }) => {
 	const classes = useStyles();
 	const history = useHistory();
 	const { user } = useContext(AuthContext);
@@ -88,10 +83,6 @@ const ScheduleModal = ({ open, onClose, scheduleId, contactId, cleanContact, rel
 	const [schedule, setSchedule] = useState(initialState);
 	const [currentContact, setCurrentContact] = useState(initialContact);
 	const [contacts, setContacts] = useState([initialContact]);
-	const [attachment, setAttachment] = useState(null);
-	const attachmentFile = useRef(null);
-	const [confirmationOpen, setConfirmationOpen] = useState(false);
-	const messageInputRef = useRef();
 
 	useEffect(() => {
 		if (contactId && contacts.length) {
@@ -103,46 +94,35 @@ const ScheduleModal = ({ open, onClose, scheduleId, contactId, cleanContact, rel
 	}, [contactId, contacts]);
 
 	useEffect(() => {
-		const { companyId } = user;
-		if (open) {
-			try {
-				(async () => {
-					const { data: contactList } = await api.get('/contacts/list', { params: { companyId: companyId } });
-					let customList = contactList.map((c) => ({ id: c.id, name: c.name }));
-					if (isArray(customList)) {
-						setContacts([{ id: "", name: "" }, ...customList]);
-					}
-					if (contactId) {
-						setSchedule(prevState => {
-							return { ...prevState, contactId }
-						});
-					}
-
-					if (!scheduleId) return;
-
-					const { data } = await api.get(`/schedules/${scheduleId}`);
+		try {
+			(async () => {
+				const { data: contactList } = await api.get('/contacts/list');
+				let customList = contactList.map((c) => ({id: c.id, name: c.name}));
+				if (isArray(customList)) {
+					setContacts([{id: "", name: ""}, ...customList]);
+				}
+				if (contactId) {
 					setSchedule(prevState => {
-						return { ...prevState, ...data, sendAt: moment(data.sendAt).format('YYYY-MM-DDTHH:mm') };
+						return { ...prevState, contactId }
 					});
-					setCurrentContact(data.contact);
-				})()
-			} catch (err) {
-				toastError(err);
-			}
+				}
+
+				if (!scheduleId) return;
+
+				const { data } = await api.get(`/schedules/${scheduleId}`);
+				setSchedule(prevState => {
+					return { ...prevState, ...data, sendAt: moment(data.sendAt).format('YYYY-MM-DDTHH:mm') };
+				});
+				setCurrentContact(data.contact);
+			})()
+		} catch (err) {
+			toastError(err);
 		}
-	}, [scheduleId, contactId, open, user]);
+	}, [scheduleId, contactId, open]);
 
 	const handleClose = () => {
 		onClose();
-		setAttachment(null);
 		setSchedule(initialState);
-	};
-
-	const handleAttachmentFile = (e) => {
-		const file = head(e.target.files);
-		if (file) {
-			setAttachment(file);
-		}
 	};
 
 	const handleSaveSchedule = async values => {
@@ -150,80 +130,25 @@ const ScheduleModal = ({ open, onClose, scheduleId, contactId, cleanContact, rel
 		try {
 			if (scheduleId) {
 				await api.put(`/schedules/${scheduleId}`, scheduleData);
-				if (attachment != null) {
-					const formData = new FormData();
-					formData.append("file", attachment);
-					await api.post(
-						`/schedules/${scheduleId}/media-upload`,
-						formData
-					);
-				}
 			} else {
-				const { data } = await api.post("/schedules", scheduleData);
-				if (attachment != null) {
-					const formData = new FormData();
-					formData.append("file", attachment);
-					await api.post(`/schedules/${data.id}/media-upload`, formData);
-				}
+				await api.post("/schedules", scheduleData);
 			}
 			toast.success(i18n.t("scheduleModal.success"));
 			if (typeof reload == 'function') {
 				reload();
 			}
-			if (contactId) {
-				if (typeof cleanContact === 'function') {
-					cleanContact();
-					history.push('/schedules');
-				}
-			}
+			setCurrentContact(initialContact);
+			setSchedule(initialState);
+			history.push('/schedules')
+
 		} catch (err) {
 			toastError(err);
 		}
-		setCurrentContact(initialContact);
-		setSchedule(initialState);
 		handleClose();
-	};
-	const handleClickMsgVar = async (msgVar, setValueFunc) => {
-		const el = messageInputRef.current;
-		const firstHalfText = el.value.substring(0, el.selectionStart);
-		const secondHalfText = el.value.substring(el.selectionEnd);
-		const newCursorPos = el.selectionStart + msgVar.length;
-
-		setValueFunc("body", `${firstHalfText}${msgVar}${secondHalfText}`);
-
-		await new Promise(r => setTimeout(r, 100));
-		messageInputRef.current.setSelectionRange(newCursorPos, newCursorPos);
-	};
-
-	const deleteMedia = async () => {
-		if (attachment) {
-			setAttachment(null);
-			attachmentFile.current.value = null;
-		}
-
-		if (schedule.mediaPath) {
-			await api.delete(`/schedules/${schedule.id}/media-upload`);
-			setSchedule((prev) => ({
-				...prev,
-				mediaPath: null,
-			}));
-			toast.success(i18n.t("scheduleModal.toasts.deleted"));
-			if (typeof reload == "function") {
-				reload();
-			}
-		}
 	};
 
 	return (
 		<div className={classes.root}>
-			<ConfirmationModal
-				title={i18n.t("scheduleModal.confirmationModal.deleteTitle")}
-				open={confirmationOpen}
-				onClose={() => setConfirmationOpen(false)}
-				onConfirm={deleteMedia}
-			>
-				{i18n.t("scheduleModal.confirmationModal.deleteMessage")}
-			</ConfirmationModal>
 			<Dialog
 				open={open}
 				onClose={handleClose}
@@ -234,14 +159,6 @@ const ScheduleModal = ({ open, onClose, scheduleId, contactId, cleanContact, rel
 				<DialogTitle id="form-dialog-title">
 					{schedule.status === 'ERRO' ? 'Erro de Envio' : `Mensagem ${capitalize(schedule.status)}`}
 				</DialogTitle>
-				<div style={{ display: "none" }}>
-					<input
-						type="file"
-						accept=".png,.jpg,.jpeg"
-						ref={attachmentFile}
-						onChange={(e) => handleAttachmentFile(e)}
-					/>
-				</div>
 				<Formik
 					initialValues={schedule}
 					enableReinitialize={true}
@@ -253,7 +170,7 @@ const ScheduleModal = ({ open, onClose, scheduleId, contactId, cleanContact, rel
 						}, 400);
 					}}
 				>
-					{({ touched, errors, isSubmitting, values, setFieldValue }) => (
+					{({ touched, errors, isSubmitting, values }) => (
 						<Form>
 							<DialogContent dividers>
 								<div className={classes.multFieldLine}>
@@ -286,7 +203,6 @@ const ScheduleModal = ({ open, onClose, scheduleId, contactId, cleanContact, rel
 										multiline={true}
 										label={i18n.t("scheduleModal.form.body")}
 										name="body"
-										inputRef={messageInputRef}
 										error={touched.body && Boolean(errors.body)}
 										helperText={touched.body && errors.body}
 										variant="outlined"
@@ -294,12 +210,6 @@ const ScheduleModal = ({ open, onClose, scheduleId, contactId, cleanContact, rel
 										fullWidth
 									/>
 								</div>
-								<Grid item>
-									<MessageVariablesPicker
-										disabled={isSubmitting}
-										onClick={value => handleClickMsgVar(value, setFieldValue)}
-									/>
-								</Grid>
 								<br />
 								<div className={classes.multFieldLine}>
 									<Field
@@ -308,7 +218,7 @@ const ScheduleModal = ({ open, onClose, scheduleId, contactId, cleanContact, rel
 										type="datetime-local"
 										name="sendAt"
 										InputLabelProps={{
-											shrink: true,
+										  shrink: true,
 										}}
 										error={touched.sendAt && Boolean(errors.sendAt)}
 										helperText={touched.sendAt && errors.sendAt}
@@ -316,31 +226,8 @@ const ScheduleModal = ({ open, onClose, scheduleId, contactId, cleanContact, rel
 										fullWidth
 									/>
 								</div>
-								{(schedule.mediaPath || attachment) && (
-									<Grid xs={12} item>
-										<Button startIcon={<AttachFile />}>
-											{attachment ? attachment.name : schedule.mediaName}
-										</Button>
-										<IconButton
-											onClick={() => setConfirmationOpen(true)}
-											color="secondary"
-										>
-											<DeleteOutline color="secondary" />
-										</IconButton>
-									</Grid>
-								)}
 							</DialogContent>
 							<DialogActions>
-								{!attachment && !schedule.mediaPath && (
-									<Button
-										color="primary"
-										onClick={() => attachmentFile.current.click()}
-										disabled={isSubmitting}
-										variant="outlined"
-									>
-										{i18n.t("quickMessages.buttons.attach")}
-									</Button>
-								)}
 								<Button
 									onClick={handleClose}
 									color="secondary"
@@ -349,7 +236,7 @@ const ScheduleModal = ({ open, onClose, scheduleId, contactId, cleanContact, rel
 								>
 									{i18n.t("scheduleModal.buttons.cancel")}
 								</Button>
-								{(schedule.sentAt === null || schedule.sentAt === "") && (
+								{ (schedule.sentAt === null || schedule.sentAt === "") && (
 									<Button
 										type="submit"
 										color="primary"
